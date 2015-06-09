@@ -72,6 +72,10 @@ main =
                         "Build the project(s) in this directory/configuration"
                         (buildCmd DoNothing)
                         buildOpts
+             addCommand "init"
+                        "Create a missing stack.yaml file"
+                        initCmd
+                        (pure ())
              addCommand "test"
                         "Build and test the project(s) in this directory/configuration"
                         (buildCmd DoTests)
@@ -322,6 +326,23 @@ readFlag = do
 buildCmd :: FinalAction -> BuildOpts -> GlobalOpts -> IO ()
 buildCmd finalAction opts go@GlobalOpts{..} = withBuildConfig go CreateConfig $
     Stack.Build.build opts { boptsFinalAction = finalAction }
+
+-- | Create a stack.yaml file, if missing
+initCmd :: () -> GlobalOpts -> IO ()
+initCmd () go@GlobalOpts{..} = do
+    (manager,lc) <- loadConfigWithOpts go
+    runStackLoggingT manager globalLogLevel $
+        Docker.rerunWithOptionalContainer (lcConfig lc) (lcProjectRoot lc) $
+        runStackLoggingT manager globalLogLevel $
+            case lcStackYaml lc of
+                Just file -> $logInfo $
+                    "stack.yaml already exists at: " <>
+                    T.pack (toFilePath file)
+                Nothing -> do
+                    bconfig <- lcLoadBuildConfig lc CreateConfig
+                    $logInfo $
+                        "Project configuration file created at: " <>
+                        T.pack (toFilePath $ bcStackYaml bconfig)
 
 -- | Unpack packages to the filesystem
 unpackCmd :: [String] -> GlobalOpts -> IO ()

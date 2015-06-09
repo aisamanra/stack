@@ -176,6 +176,11 @@ data LoadConfig m = LoadConfig
         -- ^ Action to load the remaining 'BuildConfig'.
     , lcProjectRoot     :: !(Maybe (Path Abs Dir))
         -- ^ The project root directory, if in a project.
+
+    , lcStackYaml       :: !(Maybe (Path Abs File))
+        -- ^ The project config file, if in a project.  Note: If the STACK_YAML
+        -- environment variable is used, this may not simply be lcProjectRoot
+        -- with stack.yaml appended.
     }
 
 data NoBuildConfigStrategy

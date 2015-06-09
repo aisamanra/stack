@@ -222,6 +222,7 @@ loadConfig configArgs = do
         { lcConfig          = config
         , lcLoadBuildConfig = loadBuildConfig mproject config
         , lcProjectRoot     = fmap (\(_, fp, _) -> parent fp) mproject
+        , lcStackYaml       = fmap (\(_, fp, _) -> fp) mproject
         }
 
 -- | Load the build configuration, adds build-specific values to config loaded by @loadConfig@.
