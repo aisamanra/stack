@@ -1,53 +1,54 @@
-{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE FlexibleContexts    #-}
+{-# LANGUAGE OverloadedStrings   #-}
+{-# LANGUAGE RecordWildCards     #-}
 {-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE TemplateHaskell #-}
-{-# LANGUAGE RecordWildCards #-}
-{-# LANGUAGE ViewPatterns #-}
+{-# LANGUAGE TemplateHaskell     #-}
+{-# LANGUAGE ViewPatterns        #-}
 
 -- | Main stack tool entry point.
 
 module Main where
 
 import           Control.Exception
-import           Control.Monad (join)
-import           Control.Monad.IO.Class (liftIO)
+import           Control.Monad                     (join)
+import           Control.Monad.IO.Class            (liftIO)
 import           Control.Monad.Logger
-import           Control.Monad.Reader (asks)
-import           Data.Char (toLower)
+import           Control.Monad.Reader              (asks)
+import           Data.Char                         (toLower)
 import           Data.List
-import qualified Data.List as List
-import           Data.Map (Map)
-import qualified Data.Map as Map
-import           Data.Maybe (isJust, fromMaybe)
+import qualified Data.List                         as List
+import           Data.Map                          (Map)
+import qualified Data.Map                          as Map
+import           Data.Maybe                        (fromMaybe, isJust)
 import           Data.Monoid
-import qualified Data.Text as T
-import qualified Data.Text.IO as T
+import qualified Data.Text                         as T
+import qualified Data.Text.IO                      as T
 import           Network.HTTP.Client
 import           Options.Applicative.Builder.Extra
 import           Options.Applicative.Simple
-import           Options.Applicative.Types (readerAsk)
-import           Path (toFilePath)
-import qualified Paths_stack as Meta
+import           Options.Applicative.Types         (readerAsk)
+import           Path                              (toFilePath)
+import qualified Paths_stack                       as Meta
 import           Plugins
 import           Plugins.Commands
 import           Stack.Build
 import           Stack.Build.Types
 import           Stack.Config
 import           Stack.Constants
-import qualified Stack.Docker as Docker
+import qualified Stack.Docker                      as Docker
 import           Stack.Fetch
-import           Stack.GhcPkg (envHelper)
+import           Stack.GhcPkg                      (envHelper)
+import           Stack.New
 import qualified Stack.PackageIndex
 import           Stack.Path
 import           Stack.Setup
 import           Stack.Types
 import           Stack.Types.StackT
-import           System.Environment (getArgs, getProgName)
+import           System.Environment                (getArgs, getProgName)
 import           System.Exit
-import           System.FilePath (searchPathSeparator)
-import           System.IO (stderr)
-import qualified System.Process as P
+import           System.FilePath                   (searchPathSeparator)
+import           System.IO                         (stderr)
+import qualified System.Process                    as P
 import qualified System.Process.Read
 
 -- | Commandline dispatcher.
@@ -128,6 +129,11 @@ main =
                         "Clean the local packages"
                         cleanCmd
                         (pure ())
+
+             addCommand "new"
+                        "Create a new stack-based project"
+                        newStackCmd
+                        newStackParser
              addSubCommands
                "path"
                "Print path information for certain things"
@@ -209,7 +215,7 @@ pluginShouldHaveRun _plugin _globalOpts = do
 
 
 data SetupCmdOpts = SetupCmdOpts
-    { scoGhcVersion :: !(Maybe Version)
+    { scoGhcVersion     :: !(Maybe Version)
     , scoForceReinstall :: !Bool
     }
 
@@ -255,6 +261,21 @@ setupCmd SetupCmdOpts{..} go@GlobalOpts{..} = do
                   Just paths -> $logInfo $ "Would add the following to PATH: "
                       <> T.pack (intercalate [searchPathSeparator] paths)
                   )
+
+
+newStackParser :: Parser NewStackOpts
+newStackParser = NewStackOpts
+                 <$> (T.pack <$> strArgument (metavar "CMD"))
+                 <*> (fmap T.pack <$> optional (strOption (metavar "TEMPLATE")))
+
+newStackCmd :: NewStackOpts -> GlobalOpts -> IO ()
+newStackCmd newStackCmdOpts go@GlobalOpts{..} = do
+  (manager,lc) <- loadConfigWithOpts go
+  runStackLoggingT manager globalLogLevel $
+      Docker.rerunWithOptionalContainer
+          (lcConfig lc)
+          (lcProjectRoot lc)
+          (runStackLoggingT manager globalLogLevel $ createNewStackProject newStackCmdOpts)
 
 withBuildConfig :: GlobalOpts
                 -> NoBuildConfigStrategy
